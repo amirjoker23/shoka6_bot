@@ -1,18 +1,21 @@
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    filters, ConversationHandler, ContextTypes
+)
 
-# جایگزین کن با توکن خودت:
+# جایگزین کن با توکن و آیدی ادمین خودت:
 BOT_TOKEN = "7666433350:AAEtnztPRm2s4olljqaOLiSl0Lyr08u9Y-o"
 ADMIN_ID = 1571446410
 
 # مراحل گفتگو
-(NAME, PHONE, NATIONAL_ID, MARITAL, ADDRESS, BIRTHDAY, JOB, POSTAL, BENEFICIARY_ID, BENEFICIARY_BIRTHDAY) = range(10)
-
-user_data_dict = {}
+(NAME, PHONE, NATIONAL_ID, MARITAL, ADDRESS, BIRTHDAY, JOB, PLAN, POSTAL, BENEFICIARY_ID, BENEFICIARY_BIRTHDAY) = range(11)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "سلام! 👋\nبه ربات ثبت‌نام بیمه سرمایه‌گذاری شوکا خوش اومدید.\n\nلطفا به سوالات زیر پاسخ بدید تا ثبت‌نام شما انجام بشه.\n\n🟢 برای شروع، نام و نام خانوادگی خود را ارسال کنید:"
+        "سلام! 👋\nبه ربات ثبت‌نام بیمه سرمایه‌گذاری شوکا خوش اومدید.\n\n"
+        "لطفا به سوالات زیر پاسخ بدید تا ثبت‌نام شما انجام بشه.\n\n"
+        "🟢 برای شروع، نام و نام خانوادگی خود را ارسال کنید:"
     )
     return NAME
 
@@ -53,6 +56,15 @@ async def get_birthday(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def get_job(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['job'] = update.message.text
+    keyboard = [["ماهانه"], ["سالانه"], ["یکجا"]]
+    await update.message.reply_text(
+        "لطفا طرح مورد نظر خود را انتخاب کنید:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+    )
+    return PLAN
+
+async def get_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['plan'] = update.message.text
     await update.message.reply_text("کد پستی خود را وارد کنید:")
     return POSTAL
 
@@ -69,21 +81,23 @@ async def get_beneficiary_id(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def get_beneficiary_birthday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['beneficiary_birthday'] = update.message.text
 
-    # جمع‌بندی اطلاعات
     info = context.user_data
-    message = f"📝 اطلاعات ثبت شده:\n\n" \
-              f"👤 نام: {info['name']}\n" \
-              f"📞 شماره تماس: {info['phone']}\n" \
-              f"🆔 کد ملی: {info['national_id']}\n" \
-              f"💍 وضعیت تاهل: {info['marital']}\n" \
-              f"🏠 آدرس: {info['address']}\n" \
-              f"🎂 تاریخ تولد: {info['birthday']}\n" \
-              f"💼 شغل: {info['job']}\n" \
-              f"📮 کد پستی: {info['postal']}\n" \
-              f"👨‍👩‍👦‍👦 کد ملی ذینفع: {info['beneficiary_id']}\n" \
-              f"🎂 تولد ذینفع: {info['beneficiary_birthday']}"
+    message = (
+        f"📝 اطلاعات ثبت شده:\n\n"
+        f"👤 نام: {info['name']}\n"
+        f"📞 شماره تماس: {info['phone']}\n"
+        f"🆔 کد ملی: {info['national_id']}\n"
+        f"💍 وضعیت تاهل: {info['marital']}\n"
+        f"🏠 آدرس: {info['address']}\n"
+        f"🎂 تاریخ تولد: {info['birthday']}\n"
+        f"💼 شغل: {info['job']}\n"
+        f"📅 طرح انتخابی: {info.get('plan', 'ثبت نشده')}\n"
+        f"📮 کد پستی: {info['postal']}\n"
+        f"👨‍👩‍👦‍👦 کد ملی ذینفع: {info['beneficiary_id']}\n"
+        f"🎂 تولد ذینفع: {info['beneficiary_birthday']}"
+    )
 
-    # ارسال به ادمین
+    # ارسال اطلاعات به ادمین
     await context.bot.send_message(chat_id=ADMIN_ID, text=message)
 
     # پیام به کاربر
@@ -92,32 +106,38 @@ async def get_beneficiary_birthday(update: Update, context: ContextTypes.DEFAULT
         "لینک پرداخت به زودی از طرف شرکت برای شما ارسال می‌شود.\n\n"
         "ممنون از اعتمادتون 🙏"
     )
-    return ConversationHandler.ENDasync def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return ConversationHandler.END
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("فرآیند لغو شد.")
     return ConversationHandler.END
+
 
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    conv = ConversationHandler(
+    conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
             NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_name)],
             PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_phone)],
             NATIONAL_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_national_id)],
-            MARITAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_marital)],
+            MARITAL: [MessageHandler(filters.Regex("^(متاهل|مجرد)$"), get_marital)],
             ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_address)],
             BIRTHDAY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_birthday)],
             JOB: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_job)],
+            PLAN: [MessageHandler(filters.Regex("^(ماهانه|سالانه|یکجا)$"), get_plan)],
             POSTAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_postal)],
             BENEFICIARY_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_beneficiary_id)],
             BENEFICIARY_BIRTHDAY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_beneficiary_birthday)],
         },
-        fallbacks=[CommandHandler("cancel", cancel)]
+        fallbacks=[CommandHandler("cancel", cancel)],
+        allow_reentry=True,
     )
 
-    app.add_handler(conv)
+    app.add_handler(conv_handler)
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
